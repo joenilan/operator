@@ -103,6 +103,8 @@
         const token = params.get('token');
         const channel = params.get('channel');
 
+        console.log('URL Parameters:', { username, line, token, channel });
+
         // Update status display
         document.getElementById('username').textContent = username || 'Unknown';
         document.getElementById('line').textContent = line || 'Unknown';
@@ -110,9 +112,11 @@
         // Set initial status
         const statusElement = document.getElementById('status');
         if (!username || !line || !token || !channel) {
+            console.error('Missing required parameters');
             statusElement.textContent = 'Error: Missing connection information';
             statusElement.style.color = '#ff4444';
         } else {
+            console.log('Connecting to chat for channel:', channel);
             if (line === '1') {
                 statusElement.textContent = 'You are next in line! Type a message to speak.';
                 statusElement.style.color = '#44ff44';
@@ -124,6 +128,7 @@
 
         // Embed Twitch chat
         if (channel) {
+            console.log('Embedding chat for channel:', channel);
             const chatEmbed = document.getElementById('chat-embed');
             const iframe = document.createElement('iframe');
             iframe.src = `https://www.twitch.tv/embed/${channel}/chat?parent=${window.location.hostname}&darkpopout`;
@@ -131,6 +136,11 @@
             iframe.height = '100%';
             iframe.frameBorder = '0';
             chatEmbed.appendChild(iframe);
+
+            // Log when chat is loaded
+            iframe.onload = () => {
+                console.log('Chat iframe loaded');
+            };
         }
 
         // Handle message sending
@@ -139,12 +149,25 @@
             const message = messageInput.value.trim();
             
             if (message && channel) {
+                console.log('Sending message:', message);
                 // Find the chat iframe and send the message
                 const chatFrame = document.querySelector('#chat-embed iframe');
                 if (chatFrame && chatFrame.contentWindow) {
-                    chatFrame.contentWindow.postMessage({
-                        message: `!tts ${message}`
-                    }, '*');
+                    try {
+                        chatFrame.contentWindow.postMessage({
+                            type: 'chat',
+                            message: `!tts ${message}`
+                        }, '*');
+                        console.log('Message sent to chat iframe');
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                        // Fallback: Open chat in new window
+                        window.open(`https://www.twitch.tv/popout/${channel}/chat?command=!tts ${message}`, '_blank');
+                    }
+                } else {
+                    console.error('Chat iframe not found or not ready');
+                    // Fallback: Open chat in new window
+                    window.open(`https://www.twitch.tv/popout/${channel}/chat?command=!tts ${message}`, '_blank');
                 }
                 messageInput.value = '';
             }
@@ -153,7 +176,15 @@
         // Handle Enter key
         document.getElementById('message').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
+                console.log('Enter key pressed, sending message');
                 sendMessage();
+            }
+        });
+
+        // Log any postMessage errors
+        window.addEventListener('message', function(event) {
+            if (event.data.error) {
+                console.error('Chat error:', event.data.error);
             }
         });
     </script>
