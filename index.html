@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stream Call-In System</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="status-bar">
+        <div class="status-light"></div>
+        <div class="status-display">
+          <span id="status-text">Connecting...</span>
+        </div>
+      </div>
+
+      <div class="call-interface">
+        <div class="info-panel">
+          <div class="info-row">
+            <span class="label">Connected as:</span>
+            <span id="username" class="value">...</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Line:</span>
+            <span id="line-number" class="value">...</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Status:</span>
+            <span id="call-status" class="value">Connecting...</span>
+          </div>
+        </div>
+
+        <div class="message-area">
+          <textarea
+            id="message-input"
+            placeholder="Type your message here... (Press Enter to send)"
+            disabled
+          ></textarea>
+          <button id="send-button" disabled>Send Message</button>
+        </div>
+
+        <div class="instructions">
+          <h3>How to use:</h3>
+          <ol>
+            <li>Wait for your connection to be established</li>
+            <li>Type your message in the box above</li>
+            <li>Press Enter or click Send Message</li>
+            <li>Your message will be spoken instantly on stream!</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
