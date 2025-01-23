@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Call-In System</title>
+    <title>Stream Call-In</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -29,33 +29,26 @@
             background-color: #3d3d3d;
             border-radius: 4px;
         }
-        .input-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        input[type="text"] {
-            flex: 1;
+        .audio-player {
+            width: 100%;
+            margin: 20px 0;
             padding: 10px;
-            border: none;
-            border-radius: 4px;
             background-color: #3d3d3d;
-            color: #ffffff;
-        }
-        button {
-            padding: 10px 20px;
-            border: none;
             border-radius: 4px;
-            background-color: #9146ff;
-            color: #ffffff;
-            cursor: pointer;
+            text-align: center;
         }
-        button:hover {
-            background-color: #7a2eff;
+        .audio-status {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #aaa;
         }
-        button:disabled {
-            background-color: #666;
-            cursor: not-allowed;
+        .on-air {
+            display: inline-block;
+            padding: 5px 15px;
+            background-color: #ff4444;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-bottom: 10px;
         }
         .instructions {
             margin-top: 20px;
@@ -68,123 +61,62 @@
 <body>
     <div class="container">
         <div class="status">
-            Connected as: <span id="username">...</span><br>
-            Line: <span id="line">...</span><br>
-            Status: <span id="status">Connecting...</span>
+            <div class="on-air">ON AIR</div>
+            Connected as: <span id="username">...</span>
         </div>
-        
-        <div class="input-group">
-            <input type="text" id="message" placeholder="Type your message here..." maxlength="500">
-            <button onclick="sendMessage()" id="sendButton">Send Message</button>
+
+        <div class="audio-player">
+            <audio id="streamAudio" controls autoplay>
+                <source id="audioSource" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+            <div class="audio-status">
+                Audio Status: <span id="audioStatus">Connecting...</span>
+            </div>
         </div>
 
         <div class="instructions">
             <h3>How to use:</h3>
             <ol>
-                <li>Type your message in the box above</li>
-                <li>Press Enter or click Send Message</li>
-                <li>Your message will be spoken instantly on stream!</li>
+                <li>Make sure you can hear the streamer's audio above</li>
+                <li>Type your messages in Twitch chat</li>
+                <li>Your messages will be spoken instantly on stream!</li>
             </ol>
         </div>
     </div>
 
     <script>
-        let ws = null;
-        let isConnected = false;
-        const messageInput = document.getElementById('message');
-        const sendButton = document.getElementById('sendButton');
-        const statusElement = document.getElementById('status');
-
         // Get URL parameters
         const params = new URLSearchParams(window.location.search);
         const username = params.get('user');
-        const line = params.get('line');
         const token = params.get('token');
 
         // Update display
         document.getElementById('username').textContent = username || 'Unknown';
-        document.getElementById('line').textContent = line || 'Unknown';
-        
-        // Set initial status
-        if (!username || !line || !token) {
-            console.error('Missing required parameters');
-            statusElement.textContent = 'Error: Missing connection information';
-            statusElement.style.color = '#ff4444';
-            messageInput.disabled = true;
-            sendButton.disabled = true;
-        } else {
-            connectWebSocket();
-        }
 
-        function connectWebSocket() {
-            try {
-                ws = new WebSocket(`ws://localhost:8080?user=${encodeURIComponent(username)}&token=${encodeURIComponent(token)}`);
+        // Audio setup
+        const audio = document.getElementById('streamAudio');
+        const audioStatus = document.getElementById('audioStatus');
+        const audioSource = document.getElementById('audioSource');
 
-                ws.onopen = () => {
-                    console.log('WebSocket connected');
-                    isConnected = true;
-                    messageInput.disabled = false;
-                    sendButton.disabled = false;
-                    updateStatus();
-                };
+        // Set up audio stream URL (this should point to your audio stream)
+        audioSource.src = `http://localhost:8080/audio?user=${encodeURIComponent(username)}&token=${encodeURIComponent(token)}`;
 
-                ws.onclose = () => {
-                    console.log('WebSocket disconnected');
-                    isConnected = false;
-                    messageInput.disabled = true;
-                    sendButton.disabled = true;
-                    statusElement.textContent = 'Disconnected from server';
-                    statusElement.style.color = '#ff4444';
-                    
-                    // Try to reconnect after 5 seconds
-                    setTimeout(connectWebSocket, 5000);
-                };
+        // Audio event handlers
+        audio.onplay = () => {
+            audioStatus.textContent = 'Connected to streamer audio';
+            audioStatus.style.color = '#44ff44';
+        };
 
-                ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    statusElement.textContent = 'Connection error';
-                    statusElement.style.color = '#ff4444';
-                };
-            } catch (error) {
-                console.error('Error connecting to WebSocket:', error);
-                statusElement.textContent = 'Connection error';
-                statusElement.style.color = '#ff4444';
-            }
-        }
+        audio.onpause = () => {
+            audioStatus.textContent = 'Audio paused';
+            audioStatus.style.color = '#ffff44';
+        };
 
-        function updateStatus() {
-            if (!isConnected) return;
-            
-            if (line === '1') {
-                statusElement.textContent = 'You are next in line! Type a message to speak.';
-                statusElement.style.color = '#44ff44';
-            } else {
-                statusElement.textContent = `You are #${line} in line. Please wait for your turn.`;
-                statusElement.style.color = '#ffff44';
-            }
-        }
-
-        function sendMessage() {
-            const message = messageInput.value.trim();
-            
-            if (message && isConnected) {
-                console.log('Sending message:', message);
-                ws.send(message);
-                messageInput.value = '';
-                
-                // Show confirmation
-                statusElement.textContent = 'Message sent!';
-                setTimeout(updateStatus, 2000);
-            }
-        }
-
-        // Handle Enter key
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                console.log('Enter key pressed');
-                sendMessage();
-            }
-        });
+        audio.onerror = () => {
+            audioStatus.textContent = 'Error connecting to streamer audio';
+            audioStatus.style.color = '#ff4444';
+        };
     </script>
 </body>
 </html>
