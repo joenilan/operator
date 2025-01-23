@@ -1,56 +1,120 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Stream Call-In System</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
+<html>
+<head>
+    <title>Call-In System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #3d3d3d;
+            border-radius: 4px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #3d3d3d;
+            color: #ffffff;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: #9146ff;
+            color: #ffffff;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #7a2eff;
+        }
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #3d3d3d;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
     <div class="container">
-      <div class="status-bar">
-        <div class="status-light"></div>
-        <div class="status-display">
-          <span id="status-text">Connecting...</span>
+        <div class="status">
+            Connected as: <span id="username">...</span><br>
+            Line: <span id="line">...</span><br>
+            Status: <span id="status">Connecting...</span>
         </div>
-      </div>
-
-      <div class="call-interface">
-        <div class="info-panel">
-          <div class="info-row">
-            <span class="label">Connected as:</span>
-            <span id="username" class="value">...</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Line:</span>
-            <span id="line-number" class="value">...</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Status:</span>
-            <span id="call-status" class="value">Connecting...</span>
-          </div>
-        </div>
-
-        <div class="message-area">
-          <textarea
-            id="message-input"
-            placeholder="Type your message here... (Press Enter to send)"
-            disabled
-          ></textarea>
-          <button id="send-button" disabled>Send Message</button>
+        
+        <div class="input-group">
+            <input type="text" id="message" placeholder="Type your message here..." maxlength="500">
+            <button onclick="sendMessage()">Send Message</button>
         </div>
 
         <div class="instructions">
-          <h3>How to use:</h3>
-          <ol>
-            <li>Wait for your connection to be established</li>
-            <li>Type your message in the box above</li>
-            <li>Press Enter or click Send Message</li>
-            <li>Your message will be spoken instantly on stream!</li>
-          </ol>
+            <h3>How to use:</h3>
+            <ol>
+                <li>Type your message in the box above</li>
+                <li>Press Enter or click Send Message</li>
+                <li>Your message will be spoken instantly on stream!</li>
+            </ol>
         </div>
-      </div>
     </div>
-    <script src="script.js"></script>
-  </body>
+
+    <script>
+        // Get URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const username = params.get('user');
+        const line = params.get('line');
+        const token = params.get('token');
+
+        // Update status display
+        document.getElementById('username').textContent = username || 'Unknown';
+        document.getElementById('line').textContent = line || 'Unknown';
+        document.getElementById('status').textContent = 'Ready to send messages';
+
+        // Handle message sending
+        function sendMessage() {
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value.trim();
+            
+            if (message) {
+                // Open Twitch chat with the message
+                const twitchUrl = `https://www.twitch.tv/popout/dreadedzombietv/chat?command=!tts ${message}`;
+                window.open(twitchUrl, '_blank');
+                messageInput.value = '';
+            }
+        }
+
+        // Handle Enter key
+        document.getElementById('message').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
 </html>
