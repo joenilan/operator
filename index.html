@@ -15,7 +15,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 800px;
+            max-width: 600px;
             width: 100%;
             background-color: #2d2d2d;
             border-radius: 8px;
@@ -28,13 +28,6 @@
             padding: 10px;
             background-color: #3d3d3d;
             border-radius: 4px;
-        }
-        .chat-container {
-            height: 400px;
-            margin: 20px 0;
-            border-radius: 4px;
-            overflow: hidden;
-            background-color: #3d3d3d;
         }
         .input-group {
             display: flex;
@@ -60,6 +53,10 @@
         button:hover {
             background-color: #7a2eff;
         }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
         .instructions {
             margin-top: 20px;
             padding: 15px;
@@ -78,11 +75,7 @@
         
         <div class="input-group">
             <input type="text" id="message" placeholder="Type your message here..." maxlength="500">
-            <button onclick="sendMessage()">Send Message</button>
-        </div>
-
-        <div class="chat-container" id="chat-embed">
-            <!-- Twitch chat will be embedded here -->
+            <button onclick="sendMessage()" id="sendButton">Send Message</button>
         </div>
 
         <div class="instructions">
@@ -90,33 +83,78 @@
             <ol>
                 <li>Type your message in the box above</li>
                 <li>Press Enter or click Send Message</li>
-                <li>Your message will be sent to chat with !tts prefix</li>
-                <li>The message will be spoken instantly on stream!</li>
+                <li>Your message will be spoken instantly on stream!</li>
             </ol>
         </div>
     </div>
 
     <script>
+        let ws = null;
+        let isConnected = false;
+        const messageInput = document.getElementById('message');
+        const sendButton = document.getElementById('sendButton');
+        const statusElement = document.getElementById('status');
+
         // Get URL parameters
         const params = new URLSearchParams(window.location.search);
         const username = params.get('user');
         const line = params.get('line');
         const token = params.get('token');
-        const channel = params.get('channel');
 
-        console.log('URL Parameters:', { username, line, token, channel });
-
-        // Update status display
+        // Update display
         document.getElementById('username').textContent = username || 'Unknown';
         document.getElementById('line').textContent = line || 'Unknown';
         
         // Set initial status
-        const statusElement = document.getElementById('status');
         if (!username || !line || !token) {
             console.error('Missing required parameters');
             statusElement.textContent = 'Error: Missing connection information';
             statusElement.style.color = '#ff4444';
+            messageInput.disabled = true;
+            sendButton.disabled = true;
         } else {
+            connectWebSocket();
+        }
+
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket(`ws://localhost:8080?user=${encodeURIComponent(username)}&token=${encodeURIComponent(token)}`);
+
+                ws.onopen = () => {
+                    console.log('WebSocket connected');
+                    isConnected = true;
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    updateStatus();
+                };
+
+                ws.onclose = () => {
+                    console.log('WebSocket disconnected');
+                    isConnected = false;
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                    statusElement.textContent = 'Disconnected from server';
+                    statusElement.style.color = '#ff4444';
+                    
+                    // Try to reconnect after 5 seconds
+                    setTimeout(connectWebSocket, 5000);
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    statusElement.textContent = 'Connection error';
+                    statusElement.style.color = '#ff4444';
+                };
+            } catch (error) {
+                console.error('Error connecting to WebSocket:', error);
+                statusElement.textContent = 'Connection error';
+                statusElement.style.color = '#ff4444';
+            }
+        }
+
+        function updateStatus() {
+            if (!isConnected) return;
+            
             if (line === '1') {
                 statusElement.textContent = 'You are next in line! Type a message to speak.';
                 statusElement.style.color = '#44ff44';
@@ -126,51 +164,24 @@
             }
         }
 
-        // Embed Twitch chat
-        if (channel) {
-            console.log('Embedding chat for channel:', channel);
-            const chatEmbed = document.getElementById('chat-embed');
-            const iframe = document.createElement('iframe');
-            iframe.src = `https://www.twitch.tv/embed/${channel}/chat?parent=${window.location.hostname}&darkpopout`;
-            iframe.width = '100%';
-            iframe.height = '100%';
-            iframe.frameBorder = '0';
-            chatEmbed.appendChild(iframe);
-        }
-
-        // Handle message sending
         function sendMessage() {
-            const messageInput = document.getElementById('message');
             const message = messageInput.value.trim();
             
-            if (message && username && token) {
+            if (message && isConnected) {
                 console.log('Sending message:', message);
+                ws.send(message);
+                messageInput.value = '';
                 
-                // Get chat iframe
-                const chatFrame = document.querySelector('#chat-embed iframe');
-                if (chatFrame && chatFrame.contentWindow) {
-                    // Send message to chat with !tts prefix
-                    const ttsMessage = `!tts ${message}`;
-                    chatFrame.contentWindow.postMessage({ type: 'chat', message: ttsMessage }, '*');
-                    
-                    // Clear input
-                    messageInput.value = '';
-                    
-                    // Show confirmation
-                    statusElement.textContent = 'Message sent!';
-                    setTimeout(() => {
-                        statusElement.textContent = line === '1' 
-                            ? 'You are next in line! Type a message to speak.'
-                            : `You are #${line} in line. Please wait for your turn.`;
-                    }, 2000);
-                }
+                // Show confirmation
+                statusElement.textContent = 'Message sent!';
+                setTimeout(updateStatus, 2000);
             }
         }
 
         // Handle Enter key
-        document.getElementById('message').addEventListener('keypress', function(e) {
+        messageInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                console.log('Enter key pressed, sending message');
+                console.log('Enter key pressed');
                 sendMessage();
             }
         });
