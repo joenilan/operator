@@ -15,7 +15,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 600px;
+            max-width: 800px;
             width: 100%;
             background-color: #2d2d2d;
             border-radius: 8px;
@@ -28,6 +28,13 @@
             padding: 10px;
             background-color: #3d3d3d;
             border-radius: 4px;
+        }
+        .chat-container {
+            height: 400px;
+            margin: 20px 0;
+            border-radius: 4px;
+            overflow: hidden;
+            background-color: #3d3d3d;
         }
         .input-group {
             display: flex;
@@ -74,6 +81,10 @@
             <button onclick="sendMessage()">Send Message</button>
         </div>
 
+        <div class="chat-container" id="chat-embed">
+            <!-- Twitch chat will be embedded here -->
+        </div>
+
         <div class="instructions">
             <h3>How to use:</h3>
             <ol>
@@ -90,21 +101,37 @@
         const username = params.get('user');
         const line = params.get('line');
         const token = params.get('token');
+        const channel = params.get('channel');
 
         // Update status display
         document.getElementById('username').textContent = username || 'Unknown';
         document.getElementById('line').textContent = line || 'Unknown';
         document.getElementById('status').textContent = 'Ready to send messages';
 
+        // Embed Twitch chat
+        if (channel) {
+            const chatEmbed = document.getElementById('chat-embed');
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://www.twitch.tv/embed/${channel}/chat?parent=${window.location.hostname}&darkpopout`;
+            iframe.width = '100%';
+            iframe.height = '100%';
+            iframe.frameBorder = '0';
+            chatEmbed.appendChild(iframe);
+        }
+
         // Handle message sending
         function sendMessage() {
             const messageInput = document.getElementById('message');
             const message = messageInput.value.trim();
             
-            if (message) {
-                // Open Twitch chat with the message
-                const twitchUrl = `https://www.twitch.tv/popout/dreadedzombietv/chat?command=!tts ${message}`;
-                window.open(twitchUrl, '_blank');
+            if (message && channel) {
+                // Find the chat iframe and send the message
+                const chatFrame = document.querySelector('#chat-embed iframe');
+                if (chatFrame && chatFrame.contentWindow) {
+                    chatFrame.contentWindow.postMessage({
+                        message: `!tts ${message}`
+                    }, '*');
+                }
                 messageInput.value = '';
             }
         }
