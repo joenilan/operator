@@ -4,119 +4,161 @@
     <title>Stream Call-In</title>
     <style>
         body {
-            font-family: 'Segoe UI', sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
+            background-color: #1a1a1a;
+            color: #ffffff;
         }
         .container {
             max-width: 600px;
-            width: 100%;
+            margin: 0 auto;
             background-color: #2d2d2d;
-            border-radius: 8px;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
-        .status {
+        h1 {
             text-align: center;
+            color: #9147ff;
             margin-bottom: 20px;
-            padding: 10px;
-            background-color: #3d3d3d;
-            border-radius: 4px;
         }
-        .audio-player {
-            width: 100%;
-            margin: 20px 0;
+        #status {
             padding: 10px;
-            background-color: #3d3d3d;
-            border-radius: 4px;
+            margin: 10px 0;
+            border-radius: 5px;
             text-align: center;
         }
-        .audio-status {
-            margin-top: 10px;
-            font-size: 0.9em;
-            color: #aaa;
-        }
-        .on-air {
-            display: inline-block;
-            padding: 5px 15px;
-            background-color: #ff4444;
-            border-radius: 4px;
-            font-weight: bold;
-            margin-bottom: 10px;
+        .connected { background-color: #2d7d46; }
+        .connecting { background-color: #faa61a; }
+        .disconnected { background-color: #f04747; }
+        #audioStatus {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2em;
         }
         .instructions {
-            margin-top: 20px;
+            background-color: #363636;
             padding: 15px;
-            background-color: #3d3d3d;
-            border-radius: 4px;
+            border-radius: 5px;
+            margin: 20px 0;
+            line-height: 1.5;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="status">
-            <div class="on-air">ON AIR</div>
-            Connected as: <span id="username">...</span>
-        </div>
-
-        <div class="audio-player">
-            <audio id="streamAudio" controls autoplay>
-                <source id="audioSource" type="audio/mpeg">
-                Your browser does not support the audio element.
-            </audio>
-            <div class="audio-status">
-                Audio Status: <span id="audioStatus">Connecting...</span>
-            </div>
-        </div>
-
+        <h1>Stream Call-In</h1>
+        <div id="status" class="connecting">Connecting to audio stream...</div>
+        <div id="audioStatus">🎙️ Waiting for connection...</div>
         <div class="instructions">
-            <h3>How to use:</h3>
-            <ol>
-                <li>Make sure you can hear the streamer's audio above</li>
-                <li>Type your messages in Twitch chat</li>
-                <li>Your messages will be spoken instantly on stream!</li>
-            </ol>
+            <p>📢 <strong>Instructions:</strong></p>
+            <p>1. Wait for the audio connection to be established</p>
+            <p>2. When connected, you'll hear the streamer's audio</p>
+            <p>3. Type your messages in Twitch chat to speak through TTS</p>
         </div>
     </div>
 
     <script>
         // Get URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const username = params.get('user');
-        const token = params.get('token');
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('user');
+        const token = urlParams.get('token');
+        const port = urlParams.get('port');
 
-        // Update display
-        document.getElementById('username').textContent = username || 'Unknown';
+        if (!username || !token || !port) {
+            document.getElementById('status').className = 'disconnected';
+            document.getElementById('status').textContent = 'Error: Missing connection information';
+            throw new Error('Missing connection information');
+        }
 
-        // Audio setup
-        const audio = document.getElementById('streamAudio');
-        const audioStatus = document.getElementById('audioStatus');
-        const audioSource = document.getElementById('audioSource');
+        // Set up audio context and source
+        let audioContext;
+        let audioSource;
+        let ws;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
 
-        // Set up audio stream URL (this should point to your audio stream)
-        audioSource.src = `http://localhost:8080/audio?user=${encodeURIComponent(username)}&token=${encodeURIComponent(token)}`;
+        // Initialize audio
+        async function initAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                document.getElementById('audioStatus').textContent = '🎙️ Audio system initialized';
+            } catch (error) {
+                console.error('Error initializing audio:', error);
+                document.getElementById('status').className = 'disconnected';
+                document.getElementById('status').textContent = 'Error: Could not initialize audio';
+            }
+        }
 
-        // Audio event handlers
-        audio.onplay = () => {
-            audioStatus.textContent = 'Connected to streamer audio';
-            audioStatus.style.color = '#44ff44';
-        };
+        // Process received audio data
+        async function processAudioData(audioData) {
+            try {
+                const audioBuffer = await audioContext.decodeAudioData(audioData);
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                source.start();
 
-        audio.onpause = () => {
-            audioStatus.textContent = 'Audio paused';
-            audioStatus.style.color = '#ffff44';
-        };
+                document.getElementById('audioStatus').textContent = '🎙️ Receiving audio...';
+            } catch (error) {
+                console.error('Error processing audio:', error);
+                document.getElementById('audioStatus').textContent = '❌ Error processing audio';
+            }
+        }
 
-        audio.onerror = () => {
-            audioStatus.textContent = 'Error connecting to streamer audio';
-            audioStatus.style.color = '#ff4444';
-        };
+        // Connect to WebSocket server
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket(`ws://localhost:${port}?user=${encodeURIComponent(username)}&token=${encodeURIComponent(token)}`);
+
+                ws.onopen = () => {
+                    console.log('WebSocket connected');
+                    document.getElementById('status').className = 'connected';
+                    document.getElementById('status').textContent = 'Connected to audio stream';
+                    reconnectAttempts = 0;
+                    initAudio();
+                };
+
+                ws.onmessage = async (event) => {
+                    if (event.data instanceof Blob) {
+                        const arrayBuffer = await event.data.arrayBuffer();
+                        await processAudioData(arrayBuffer);
+                    }
+                };
+
+                ws.onclose = () => {
+                    document.getElementById('status').className = 'disconnected';
+                    document.getElementById('status').textContent = 'Disconnected from audio stream';
+                    
+                    // Try to reconnect
+                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        reconnectAttempts++;
+                        setTimeout(connectWebSocket, 5000);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    document.getElementById('status').className = 'disconnected';
+                    document.getElementById('status').textContent = 'Error: Could not connect to audio stream';
+                };
+            } catch (error) {
+                console.error('Error connecting to WebSocket:', error);
+                document.getElementById('status').className = 'disconnected';
+                document.getElementById('status').textContent = 'Error: Could not connect to audio stream';
+            }
+        }
+
+        // Start connection
+        connectWebSocket();
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        });
     </script>
 </body>
 </html>
