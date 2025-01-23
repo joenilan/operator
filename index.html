@@ -111,12 +111,11 @@
         
         // Set initial status
         const statusElement = document.getElementById('status');
-        if (!username || !line || !token || !channel) {
+        if (!username || !line || !token) {
             console.error('Missing required parameters');
             statusElement.textContent = 'Error: Missing connection information';
             statusElement.style.color = '#ff4444';
         } else {
-            console.log('Connecting to chat for channel:', channel);
             if (line === '1') {
                 statusElement.textContent = 'You are next in line! Type a message to speak.';
                 statusElement.style.color = '#44ff44';
@@ -148,28 +147,41 @@
             const messageInput = document.getElementById('message');
             const message = messageInput.value.trim();
             
-            if (message && channel) {
+            if (message && username && token) {
                 console.log('Sending message:', message);
-                // Find the chat iframe and send the message
-                const chatFrame = document.querySelector('#chat-embed iframe');
-                if (chatFrame && chatFrame.contentWindow) {
-                    try {
-                        chatFrame.contentWindow.postMessage({
-                            type: 'chat',
-                            message: `!tts ${message}`
-                        }, '*');
-                        console.log('Message sent to chat iframe');
-                    } catch (error) {
-                        console.error('Error sending message:', error);
-                        // Fallback: Open chat in new window
-                        window.open(`https://www.twitch.tv/popout/${channel}/chat?command=!tts ${message}`, '_blank');
-                    }
-                } else {
-                    console.error('Chat iframe not found or not ready');
-                    // Fallback: Open chat in new window
-                    window.open(`https://www.twitch.tv/popout/${channel}/chat?command=!tts ${message}`, '_blank');
+                
+                // Create message object
+                const messageObj = {
+                    username: username,
+                    token: token,
+                    message: message,
+                    timestamp: Date.now()
+                };
+
+                // Get existing messages array or create new one
+                let messages = JSON.parse(localStorage.getItem('ttsMessages') || '[]');
+                
+                // Add new message
+                messages.push(messageObj);
+                
+                // Keep only last 100 messages
+                if (messages.length > 100) {
+                    messages = messages.slice(-100);
                 }
+                
+                // Save back to localStorage
+                localStorage.setItem('ttsMessages', JSON.stringify(messages));
+                
+                // Clear input
                 messageInput.value = '';
+                
+                // Show confirmation
+                statusElement.textContent = 'Message sent!';
+                setTimeout(() => {
+                    statusElement.textContent = line === '1' 
+                        ? 'You are next in line! Type a message to speak.'
+                        : `You are #${line} in line. Please wait for your turn.`;
+                }, 2000);
             }
         }
 
