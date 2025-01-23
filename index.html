@@ -90,7 +90,8 @@
             <ol>
                 <li>Type your message in the box above</li>
                 <li>Press Enter or click Send Message</li>
-                <li>Your message will be spoken instantly on stream!</li>
+                <li>Your message will be sent to chat with !tts prefix</li>
+                <li>The message will be spoken instantly on stream!</li>
             </ol>
         </div>
     </div>
@@ -135,11 +136,6 @@
             iframe.height = '100%';
             iframe.frameBorder = '0';
             chatEmbed.appendChild(iframe);
-
-            // Log when chat is loaded
-            iframe.onload = () => {
-                console.log('Chat iframe loaded');
-            };
         }
 
         // Handle message sending
@@ -150,38 +146,24 @@
             if (message && username && token) {
                 console.log('Sending message:', message);
                 
-                // Create message object
-                const messageObj = {
-                    username: username,
-                    token: token,
-                    message: message,
-                    timestamp: Date.now()
-                };
-
-                // Get existing messages array or create new one
-                let messages = JSON.parse(localStorage.getItem('ttsMessages') || '[]');
-                
-                // Add new message
-                messages.push(messageObj);
-                
-                // Keep only last 100 messages
-                if (messages.length > 100) {
-                    messages = messages.slice(-100);
+                // Get chat iframe
+                const chatFrame = document.querySelector('#chat-embed iframe');
+                if (chatFrame && chatFrame.contentWindow) {
+                    // Send message to chat with !tts prefix
+                    const ttsMessage = `!tts ${message}`;
+                    chatFrame.contentWindow.postMessage({ type: 'chat', message: ttsMessage }, '*');
+                    
+                    // Clear input
+                    messageInput.value = '';
+                    
+                    // Show confirmation
+                    statusElement.textContent = 'Message sent!';
+                    setTimeout(() => {
+                        statusElement.textContent = line === '1' 
+                            ? 'You are next in line! Type a message to speak.'
+                            : `You are #${line} in line. Please wait for your turn.`;
+                    }, 2000);
                 }
-                
-                // Save back to localStorage
-                localStorage.setItem('ttsMessages', JSON.stringify(messages));
-                
-                // Clear input
-                messageInput.value = '';
-                
-                // Show confirmation
-                statusElement.textContent = 'Message sent!';
-                setTimeout(() => {
-                    statusElement.textContent = line === '1' 
-                        ? 'You are next in line! Type a message to speak.'
-                        : `You are #${line} in line. Please wait for your turn.`;
-                }, 2000);
             }
         }
 
@@ -190,13 +172,6 @@
             if (e.key === 'Enter') {
                 console.log('Enter key pressed, sending message');
                 sendMessage();
-            }
-        });
-
-        // Log any postMessage errors
-        window.addEventListener('message', function(event) {
-            if (event.data.error) {
-                console.error('Chat error:', event.data.error);
             }
         });
     </script>
