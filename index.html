@@ -106,7 +106,21 @@
         // Update status display
         document.getElementById('username').textContent = username || 'Unknown';
         document.getElementById('line').textContent = line || 'Unknown';
-        document.getElementById('status').textContent = 'Ready to send messages';
+        
+        // Set initial status
+        const statusElement = document.getElementById('status');
+        if (!username || !line || !token || !channel) {
+            statusElement.textContent = 'Error: Missing connection information';
+            statusElement.style.color = '#ff4444';
+        } else {
+            if (line === '1') {
+                statusElement.textContent = 'You are next in line! Type a message to speak.';
+                statusElement.style.color = '#44ff44';
+            } else {
+                statusElement.textContent = `You are #${line} in line. Please wait for your turn.`;
+                statusElement.style.color = '#ffff44';
+            }
+        }
 
         // Embed Twitch chat
         if (channel) {
